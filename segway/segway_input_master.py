@@ -169,24 +169,22 @@ def save_input_master(runner, input_master_filename, params_dirpath=None,
     """
     Save the input.master file using the GMTK API.
     """
-
-    # Initialize InputMaster for global values and initial parameter values
-    input_master_main = InputMaster(is_param=False)
-    input_master_init = InputMaster(is_param=True)
-
-
     # Preamble
     include_filename = runner.gmtk_include_filename_relative
-    card_seg = runner.num_segs
-    segway_preamble = \
+    segway_include_preamble = \
 f"""#include "{include_filename}"
-
-#if CARD_SEG != {card_seg}
+"""
+    card_seg = runner.num_segs
+    segway_main_preamble = segway_include_preamble + \
+f"""#if CARD_SEG != {card_seg}
 #error Specified number of segment labels (CARD_SEG) does not match the number used for this input master file ({card_seg})
 #endif
 
 """
-    input_master_main.preamble = segway_preamble
+
+    # Initialize InputMaster for global values and initial parameter values
+    input_master_main = InputMaster(preamble=segway_main_preamble, is_param=False)
+    input_master_init = InputMaster(preamble=segway_include_preamble, is_param=True)
 
     # Decision Trees (DT_IN_FILE)
     segCountDown_tree = make_segCountDown_tree(runner)
