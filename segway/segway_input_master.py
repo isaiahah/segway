@@ -171,8 +171,8 @@ def save_input_master(runner, input_master_filename, params_dirpath=None,
     """
 
     # Initialize InputMaster for global values and initial parameter values
-    input_master_main = InputMaster()
-    input_master_init = InputMaster()
+    input_master_main = InputMaster(is_param=False)
+    input_master_init = InputMaster(is_param=True)
 
 
     # Preamble

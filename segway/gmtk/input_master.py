@@ -5,10 +5,6 @@ from typing import List, Optional, Union
 from numpy import array, asarray, empty, ndarray, squeeze
 
 
-INPUT_MASTER_PREAMBLE = \
-    """#define COMPONENT_TYPE_DIAG_GAUSSIAN 0"""
-
-
 COMPONENT_TYPE_DIAG_GAUSSIAN = 0
 OBJ_KIND_MEAN = "MEAN"
 OBJ_KIND_COVAR = "COVAR"
@@ -571,12 +567,14 @@ class Section(dict):
     Attributes:
             kind: str: specifies the kind of GMTK object (default assumes that
                 `self` has no kind)
+            is_param: bool: specifies if this section should be printed for
+                a param file (omit the first header line)
             line_before: str: string to print before the section, often a
                 preprocessor rule
             line_after: str: string to print after the section, often a
                 preprocessor rule
     """
-    def __init__(self, kind: Optional[str] = None):
+    def __init__(self, kind: Optional[str] = None, is_param: bool = False):
         """
         Initialize an empty Section object.
         """
@@ -609,7 +607,11 @@ class Section(dict):
         Generate header lines for this Section object.
         """
         # object title and total number of GMTK/MC/MX objects
-        return [f"{self.kind}_IN_FILE inline", f"{len(self)}\n"]
+        header = []
+        if not self.is_param:
+            header.append(f"{self.kind}_IN_FILE inline")
+        header.append(f"{len(self)}\n")
+        return header
 
 
 class InlineSection(Section):
@@ -683,14 +685,17 @@ class InlineMCSection(InlineSection):
         mean: InlineSection object which point to InputMaster.mean
         covar: InlineSection object which point to InputMaster.covar
     """
-    def __init__(self, mean: InlineSection, covar: InlineSection):
+    def __init__(self, mean: InlineSection, covar: InlineSection,
+                 is_param: bool = False):
         """
         :param mean: InlineSection: InlineSection object which point to
         InputMaster.mean
         :param covar: InlineSection: InlineSection object which point to
         InputMaster.covar
+        :param is_param: bool: specifies if this section should be printed for
+        a param file (omit the first header line)
         """
-        super().__init__(OBJ_KIND_MC)
+        super().__init__(OBJ_KIND_MC, is_param)
         self.mean = mean
         self.covar = covar
 
@@ -739,14 +744,17 @@ class InlineMXSection(InlineSection):
         components: InlineSection object which point to InputMaster.mc
     """
 
-    def __init__(self, dpmf: InlineSection, mc: InlineSection):
+    def __init__(self, dpmf: InlineSection, mc: InlineSection,
+                 is_param: bool = False):
         """
         :param dpmf: InlineSection: InlineSection object which point to
         InputMaster.dpmf
         :param components: InlineSection: InlineSection object which point to
         InputMaster.mc
+        :param is_param: bool: specifies if this section should be printed for
+        a param file (omit the first header line)
         """
-        super().__init__(OBJ_KIND_MX)
+        super().__init__(OBJ_KIND_MX, is_param)
         self.dpmf = dpmf
         self.mc = mc
 
@@ -804,25 +812,25 @@ class InputMaster:
         input master
     """
 
-    def __init__(self, preamble=INPUT_MASTER_PREAMBLE):
+    def __init__(self, preamble="", is_param=False):
         """
         Initialize InputMaster instance with empty attributes (InlineSection
         and its subclasses).
         """
         self.preamble = preamble
-        self.dt = InlineSection(OBJ_KIND_DT)
-        self.name_collection = InlineSection(OBJ_KIND_NAMECOLLECTION)
-        self.dirichlet = InlineSection(OBJ_KIND_DIRICHLETTAB)
-        self.deterministic_cpt = InlineSection(OBJ_KIND_DETERMINISTICCPT)
-        self.virtual_evidence = InlineSection(OBJ_KIND_VECPT)
-        self.dense_cpt = InlineSection(OBJ_KIND_DENSECPT)
-        self.trainable_params = InlineSection(OBJ_KIND_ARBITRARYSTRING)
-        self.mean = InlineSection(OBJ_KIND_MEAN)
-        self.covar = InlineSection(OBJ_KIND_COVAR)
-        self.dpmf = InlineSection(OBJ_KIND_DPMF)
-        self.mc = InlineMCSection(mean=self.mean, covar=self.covar)
-        self.mx = InlineMXSection(dpmf=self.dpmf, mc=self.mc)
-        self.real_mat = InlineSection(OBJ_KIND_RM)
+        self.dt = InlineSection(OBJ_KIND_DT, is_param)
+        self.name_collection = InlineSection(OBJ_KIND_NAMECOLLECTION, is_param)
+        self.dirichlet = InlineSection(OBJ_KIND_DIRICHLETTAB, is_param)
+        self.deterministic_cpt = InlineSection(OBJ_KIND_DETERMINISTICCPT, is_param)
+        self.virtual_evidence = InlineSection(OBJ_KIND_VECPT, is_param)
+        self.dense_cpt = InlineSection(OBJ_KIND_DENSECPT, is_param)
+        self.trainable_params = InlineSection(OBJ_KIND_ARBITRARYSTRING, is_param)
+        self.mean = InlineSection(OBJ_KIND_MEAN, is_param)
+        self.covar = InlineSection(OBJ_KIND_COVAR, is_param)
+        self.dpmf = InlineSection(OBJ_KIND_DPMF, is_param)
+        self.mc = InlineMCSection(mean=self.mean, covar=self.covar, is_param=is_param)
+        self.mx = InlineMXSection(dpmf=self.dpmf, mc=self.mc, is_param=is_param)
+        self.real_mat = InlineSection(OBJ_KIND_RM, is_param)
 
     def __str__(self) -> str:
         """
