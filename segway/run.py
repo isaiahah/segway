@@ -2874,6 +2874,8 @@ class Runner(object):
         returns not None: abort
         """
         last_params_filename = self.last_params_filename
+        if round_index == 0:
+            last_params_filename = self.input_master_filename + ".init"
         curr_params_filename = extjoin(self.params_filename, str(round_index))
 
         if self.minibatch_fraction == MINIBATCH_DEFAULT:

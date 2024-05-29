@@ -816,6 +816,7 @@ class InputMaster:
         self.deterministic_cpt = InlineSection(OBJ_KIND_DETERMINISTICCPT)
         self.virtual_evidence = InlineSection(OBJ_KIND_VECPT)
         self.dense_cpt = InlineSection(OBJ_KIND_DENSECPT)
+        self.trainable_params = InlineSection(OBJ_KIND_ARBITRARYSTRING)
         self.mean = InlineSection(OBJ_KIND_MEAN)
         self.covar = InlineSection(OBJ_KIND_COVAR)
         self.dpmf = InlineSection(OBJ_KIND_DPMF)
@@ -830,7 +831,7 @@ class InputMaster:
         """
         sections = [self.preamble, self.dt, self.name_collection,
                     self.dirichlet, self.deterministic_cpt,
-                    self.virtual_evidence, self.dense_cpt, self.mean,
+                    self.virtual_evidence, self.trainable_params, self.dense_cpt, self.mean,
                     self.covar, self.dpmf, self.mc, self.mx, self.real_mat]
 
         return "\n".join([str(section) for section in sections])

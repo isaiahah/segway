@@ -24,10 +24,11 @@ from ._util import (copy_attrs, data_string, DISTRIBUTION_ASINH_NORMAL,
                     SUPERVISION_SUPERVISED,
                     SUPERVISION_UNSUPERVISED, USE_MFSDG,
                     VIRTUAL_EVIDENCE_LIST_FILENAME)
-from .gmtk.input_master import (DecisionTree, DenseCPT, DeterministicCPT,
-                                DiagGaussianMC, DirichletTable, DPMF,
-                                InputMaster, MissingFeatureDiagGaussianMC, MX,
-                                RealMat, VirtualEvidence)
+from .gmtk.input_master import (ArbitraryString, DecisionTree, DenseCPT,
+                                DeterministicCPT, DiagGaussianMC,
+                                DirichletTable, DPMF, InputMaster,
+                                MissingFeatureDiagGaussianMC, MX, RealMat,
+                                VirtualEvidence)
 
 # NB: Currently Segway relies on older (Numpy < 1.14) printed representations
 # of scalars and vectors in the parameter output. By default in newer (> 1.14)
@@ -169,8 +170,10 @@ def save_input_master(runner, input_master_filename, params_dirpath=None,
     Save the input.master file using the GMTK API.
     """
 
-    # Initialize InputMaster option
-    input_master = InputMaster()
+    # Initialize InputMaster for global values and initial parameter values
+    input_master_main = InputMaster()
+    input_master_init = InputMaster()
+
 
     # Preamble
     include_filename = runner.gmtk_include_filename_relative
@@ -183,7 +186,7 @@ f"""#include "{include_filename}"
 #endif
 
 """
-    input_master.preamble = segway_preamble
+    input_master_main.preamble = segway_preamble
 
     # Decision Trees (DT_IN_FILE)
     segCountDown_tree = make_segCountDown_tree(runner)
@@ -193,7 +196,7 @@ f"""#include "{include_filename}"
 % is the frameIndex divisible by RULER_SCALE
     -1 { mod(p0, RULER_SCALE) == 0 }
 """
-    input_master.dt["map_frameIndex_ruler"] = \
+    input_master_main.dt["map_frameIndex_ruler"] = \
         DecisionTree(map_frameIndex_ruler_tree)
     
     map_seg_segCountDown_tree = \
@@ -201,7 +204,7 @@ f"""1
 % this is only used at the beginning of an observation track
 0 {segCountDown_tree}
 """
-    input_master.dt["map_seg_segCountDown"] = \
+    input_master_main.dt["map_seg_segCountDown"] = \
         DecisionTree(map_seg_segCountDown_tree)
     
     map_segTransition_ruler_seg_segCountDown_segCountDown_tree = \
@@ -220,14 +223,14 @@ f"""4
             % ruler(0) == 1:
             -1 {{ max(p3-1, 0) }} % subtract 1 from previous value, or 0
 """
-    input_master.dt["map_segTransition_ruler_seg_segCountDown_segCountDown"] = \
+    input_master_main.dt["map_segTransition_ruler_seg_segCountDown_segCountDown"] = \
         DecisionTree(map_segTransition_ruler_seg_segCountDown_segCountDown_tree)
 
     map_seg_subseg_obs_tree = \
 """2       % num parents
         -1 { p0*CARD_SUBSEG + p1 }
 """
-    input_master.dt["map_seg_subseg_obs"] = \
+    input_master_main.dt["map_seg_subseg_obs"] = \
         DecisionTree(map_seg_subseg_obs_tree)
 
     if runner.supervision_type == SUPERVISION_SEMISUPERVISED:
@@ -254,7 +257,7 @@ f"""4
             -1 { (p1 > (p0-SUPERVISION_LABEL_OFFSET-1)) && (p1 < (p0-SUPERVISION_LABEL_OFFSET+SUPERVISIONLABEL_RANGE_SIZE)) }
         #endif
 """
-        input_master.dt["map_supervisionLabel_seg_alwaysTrue"] = \
+        input_master_main.dt["map_supervisionLabel_seg_alwaysTrue"] = \
             DecisionTree(map_supervisionLabel_seg_alwaysTrue)
 
     # Dirichlet Table
@@ -266,51 +269,63 @@ f"""4
         pseudocounts_per_row = total_pseudocounts / divisor
         pseudocounts = (probs * pseudocounts_per_row).astype(int)
 
-        input_master.dirichlet["dirichlet_segCountDown_seg_segTransition"] = \
+        input_master_main.dirichlet["dirichlet_segCountDown_seg_segTransition"] = \
             DirichletTable(pseudocounts, keep_shape=True)
 
     # Deterministic CPTs
-    input_master.deterministic_cpt["seg_segCountDown"] = \
+    input_master_main.deterministic_cpt["seg_segCountDown"] = \
         DeterministicCPT(("CARD_SEG", ), "CARD_SEGCOUNTDOWN",
                          "map_seg_segCountDown")
-    input_master.deterministic_cpt["frameIndex_ruler"] = \
+    input_master_main.deterministic_cpt["frameIndex_ruler"] = \
         DeterministicCPT(("CARD_FRAMEINDEX", ), "CARD_RULER",
                          "map_frameIndex_ruler")
-    input_master.deterministic_cpt["segTransition_ruler_seg_segCountDown_segCountDown"] = \
+    input_master_main.deterministic_cpt["segTransition_ruler_seg_segCountDown_segCountDown"] = \
         DeterministicCPT(("CARD_SEGTRANSITION", "CARD_RULER", "CARD_SEG",
                           "CARD_SEGCOUNTDOWN"), "CARD_SEGCOUNTDOWN",
                          "map_segTransition_ruler_seg_segCountDown_segCountDown")
-    input_master.deterministic_cpt["seg_seg_copy"] = \
+    input_master_main.deterministic_cpt["seg_seg_copy"] = \
         DeterministicCPT(("CARD_SEG", ), "CARD_SEG",
                          "internal:copyParent")
-    input_master.deterministic_cpt["subseg_subseg_copy"] = \
+    input_master_main.deterministic_cpt["subseg_subseg_copy"] = \
         DeterministicCPT(("CARD_SUBSEG", ), "CARD_SUBSEG",
                          "internal:copyParent")
     if runner.supervision_type == SUPERVISION_SEMISUPERVISED:
-        input_master.deterministic_cpt["supervisionLabel_seg_alwaysTrue"] = \
+        input_master_main.deterministic_cpt["supervisionLabel_seg_alwaysTrue"] = \
             DeterministicCPT(("CARD_SUPERVISIONLABEL", "CARD_SEG"),
                              "CARD_BOOLEAN",
                              "map_supervisionLabel_seg_alwaysTrue")
     else:
         assert (runner.supervision_type == SUPERVISION_SUPERVISED or
                 runner.supervision_type == SUPERVISION_UNSUPERVISED)
+        
+    # Write the placeholder section to the main input.master file
+    params_placeholder = \
+"""
+DENSE_CPT_IN_FILE INPUT_PARAMS_FILENAME ascii
+MEAN_IN_FILE INPUT_PARAMS_FILENAME ascii
+COVAR_IN_FILE INPUT_PARAMS_FILENAME ascii
+DPMF_IN_FILE INPUT_PARAMS_FILENAME ascii
+MC_IN_FILE INPUT_PARAMS_FILENAME ascii
+MX_IN_FILE INPUT_PARAMS_FILENAME ascii
+"""
+    input_master_main.trainable_params["trainable"] = \
+        ArbitraryString(params_placeholder)
 
-    # DenseCPT begins the block conditional on INPUT_PARAMS_FILENAME
-    input_master.dense_cpt.line_before = "#ifndef INPUT_PARAMS_FILENAME"
+    # Write the initial values of trainable distributions in params.init
     # Dense CPTs
     num_segs = runner.num_segs
     num_subsegs = runner.num_subsegs
-    input_master.dense_cpt["start_seg"] = DenseCPT.uniform_from_shape(num_segs)
-    input_master.dense_cpt["seg_subseg"] = \
+    input_master_init.dense_cpt["start_seg"] = DenseCPT.uniform_from_shape(num_segs)
+    input_master_init.dense_cpt["seg_subseg"] = \
         DenseCPT.uniform_from_shape(num_segs, num_subsegs)
-    input_master.dense_cpt["seg_seg"] = \
+    input_master_init.dense_cpt["seg_seg"] = \
         DenseCPT.uniform_from_shape(num_segs, num_segs)
-    input_master.dense_cpt["seg_subseg_subseg"] = \
+    input_master_init.dense_cpt["seg_subseg_subseg"] = \
         DenseCPT.uniform_from_shape(num_segs, num_subsegs, num_subsegs)
-    input_master.dense_cpt["segCountDown_seg_segTransition"] = \
+    input_master_init.dense_cpt["segCountDown_seg_segTransition"] = \
         make_dense_cpt_segCountDown_seg_segTransition_cpt(runner)
     if runner.use_dinucleotide:
-        input_master.dense_cpt["seg_dinucleotide"] = \
+        input_master_init.dense_cpt["seg_dinucleotide"] = \
             make_dense_cpt_seg_dinucleotide_cpt()
 
     distribution = runner.distribution
@@ -335,7 +350,7 @@ f"""4
 
                         # Mean (MEAN_IN_FILE)
                         mean_name = f"mean_{seg_name}_{subseg_name}_{track_name}{component_suffix}"
-                        input_master.mean[mean_name] = \
+                        input_master_init.mean[mean_name] = \
                             mean_data[seg_index, subseg_index, track_index]
 
                         # Covar (COVAR_IN_FILE)
@@ -343,28 +358,28 @@ f"""4
                         if COVAR_TIED:
                             covar_name = f"covar_{track_name}{component_suffix}"
                             if seg_index == 0 and subseg_index == 0:
-                                input_master.covar[covar_name] = \
+                                input_master_init.covar[covar_name] = \
                                     covar_data[seg_index, subseg_index,
                                                track_index]
                         else:  # Otherwise, write for every seg and subseg
                             covar_name = f"covar_{seg_name}_{subseg_name}_{track_name}{component_suffix}"
-                            input_master.covar[covar_name] = \
+                            input_master_init.covar[covar_name] = \
                                 covar_data[seg_index, subseg_index,
                                            track_index]
 
                         # Diag Gaussian MC with mean and covar name (MC_IN_FILE)
                         mc_name = f"mc_{distribution}_{seg_name}_{subseg_name}_{track_name}{component_suffix}"
                         if USE_MFSDG:  # Add weights to end of Gaussian
-                            input_master.mc[mc_name] = \
+                            input_master_init.mc[mc_name] = \
                                 MissingFeatureDiagGaussianMC(mean=mean_name,
                                                              covar=covar_name)
                         else:
-                            input_master.mc[mc_name] = \
+                            input_master_init.mc[mc_name] = \
                                 DiagGaussianMC(mean=mean_name, covar=covar_name)
 
         # RealMat
         if USE_MFSDG:
-            input_master.real_mat["matrix_weightscale_1x1"] = RealMat(1.0)
+            input_master_main.real_mat["matrix_weightscale_1x1"] = RealMat(1.0)
 
     else:
         raise ValueError("distribution %s not supported" % distribution)
@@ -396,30 +411,15 @@ f"""4
 
                 mx_name = f"mx_{seg_name}_{subseg_name}_{track_name}"
                 name_collection_items.append(mx_name)
-                input_master.mx[mx_name] = MX(dpmf_name, mx_components)
+                input_master_init.mx[mx_name] = MX(dpmf_name, mx_components)
 
         # Name Collection (NAME_COLLECTION_IN_LINE)
-        input_master.name_collection[name_collection_name] = \
+        input_master_main.name_collection[name_collection_name] = \
             name_collection_items
-        
-    # Mixture collection ends the block conditional on INPUT_PARAMS_FILENAME
-    input_master.mx.line_after = \
-"""
-#else
-
-DENSE_CPT_IN_FILE INPUT_PARAMS_FILENAME ascii
-MEAN_IN_FILE INPUT_PARAMS_FILENAME ascii
-COVAR_IN_FILE INPUT_PARAMS_FILENAME ascii
-DPMF_IN_FILE INPUT_PARAMS_FILENAME ascii
-MC_IN_FILE INPUT_PARAMS_FILENAME ascii
-MX_IN_FILE INPUT_PARAMS_FILENAME ascii
-
-#endif
-"""
 
     # DPMF (DPMF_IN_FILE)
     if runner.num_mix_components == 1:
-        input_master.dpmf["dpmf_always"] = DPMF.uniform_from_shape(1)
+        input_master_init.dpmf["dpmf_always"] = DPMF.uniform_from_shape(1)
     else:
         for seg_index in range(num_segs):
             seg_name = f"seg{seg_index}"
@@ -430,24 +430,24 @@ MX_IN_FILE INPUT_PARAMS_FILENAME ascii
 
                     dpmf_name = f"dpmf_{seg_name}_{subseg_name}_{track_name}"
                     # TODO: Does not include "DirichletConst 100"
-                    input_master.dpmf[dpmf_name] = \
+                    input_master_init.dpmf[dpmf_name] = \
                         DPMF.uniform_from_shape(runner.num_mix_components)
 
     # Virtual Evidence (VE_CPT_IN_FILE)
-    # TODO: This is a hardcoded string rather than a custom type as the one
-    # line type supports only array-like data
     if runner.virtual_evidence:
-        input_master.virtual_evidence["seg_virtualEvidence"] = \
+        input_master_main.virtual_evidence["seg_virtualEvidence"] = \
             VirtualEvidence(num_segs, VIRTUAL_EVIDENCE_LIST_FILENAME)
-        input_master.virtual_evidence.line_before = "#if VIRTUAL_EVIDENCE == 1"
-        input_master.virtual_evidence.line_after = "#endif"
+        input_master_main.virtual_evidence.line_before = "#if VIRTUAL_EVIDENCE == 1"
+        input_master_main.virtual_evidence.line_after = "#endif"
 
     if not input_master_filename:
         input_master_filename = \
             make_default_filename(input_master_filename, params_dirpath,
                                   instance_index)
+        input_master_init_filename = input_master_filename + ".init"
 
-    input_master.save(input_master_filename)
+    input_master_main.save(input_master_filename)
+    input_master_init.save(input_master_init_filename)
 
 
 def make_segCountDown_tree(runner):
