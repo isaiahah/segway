@@ -444,7 +444,8 @@ MX_IN_FILE INPUT_PARAMS_FILENAME ascii
         input_master_filename = \
             make_default_filename(input_master_filename, params_dirpath,
                                   instance_index)
-        input_master_init_filename = input_master_filename + ".init"
+    
+    input_master_init_filename = input_master_filename + ".init"
 
     input_master_main.save(input_master_filename)
     input_master_init.save(input_master_init_filename)
