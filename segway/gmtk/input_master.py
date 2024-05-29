@@ -580,6 +580,7 @@ class Section(dict):
         """
         super().__init__()
         self.kind = kind
+        self.is_param = is_param
         self.line_before = None
         self.line_after = None
 
