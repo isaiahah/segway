@@ -1,19 +1,19 @@
 ====================
-GMTK API Reference
+Segway Toolkit Reference
 ====================
 
 Description
 ===========
 
-The GMTK API provides a Python framework to design dynamic Bayesian models for custom 
+The Segway Toolkit provides a Python framework to design dynamic Bayesian models for custom 
 tasks. Segway can perform training and inference using these user-defined models.
 
-The GMTK API is installed with Segway automatically. 
+The Segway Toolkit is installed with Segway automatically. 
 
 Workflow
 ========
 
-The GMTK API describes the model using two files:
+The Segway Toolkit describes the model using two files:
 
   1. A structure file describing the graphical network's nodes and 
   edges. This should be written using the GMTK structure language. The GMTK 
@@ -21,7 +21,7 @@ The GMTK API describes the model using two files:
   `GMTK Documentation <https://github.com/melodi-lab/gmtk/blob/master/documentation.pdf>`_.
 
   2. A Python file describing the initial parameter settings and Segway 
-  commands for training and inference. The classes provided by the GMTK API
+  commands for training and inference. The classes provided by the Segway Toolkit
   for writing this file are described below. It should contain 3 sections:
 
     1. Code defining an :py:class:`InputMaster` object and setting its 
@@ -35,7 +35,7 @@ The GMTK API describes the model using two files:
     :ref:`python-interface`.
 
 The `CNVway code <https://github.com/hoffmangroup/cnvway>`_ provides a worked 
-example applying the GMTK API to defining, training, and running a new model.
+example applying the Segway Toolkit to defining, training, and running a new model.
 
 .. todo: other section? flip sentence order? link?
 
@@ -45,6 +45,22 @@ InputMaster Class
 Central class storing all parameter information.
 
 .. py:class:: InputMaster
+
+    .. py:attribute:: preamble
+        :type: str
+
+    Stores a string which is included as the preamble to the parameter file.
+
+    This is the recommended location for C preprocessor commands such as
+    ``#define`` and ``#include`` statements.
+
+    .. py:attribute:: dt
+        :type: InlineSection
+
+    Stores the DecisionTrees used in the model.
+
+    Behaves as a dictionary where keys are decision tree names and each value 
+    should be set to a :py:class:`DecisionTree` object. 
 
     .. py:attribute:: name_collection
         :type: InlineSection
@@ -57,6 +73,51 @@ Central class storing all parameter information.
     object initialized with state names. If a Python list is given, it is 
     converted to a :py:class:`NameCollection` object using 
     :py:meth:`NameCollection.__init__`.
+
+    .. py:attribute:: dirichlet
+        :type: InlineSection
+    
+    Stores Dirichlet distributions used in the model. 
+    
+    Behaves as a dictionary where keys are decision tree names and each value 
+    should be set to a :py:class:`DirichletTable` object. 
+
+    .. py:attribute:: deterministic_cpt
+        :type: InlineSection
+
+    Stores deterministic conditional probability tables (CPTs) used when the
+    model is run without supervision.
+    
+    Behaves as a dictionary where keys are distribution names, which can 
+    be referenced in the structure file, and each value is a 
+    :py:class:`DeterministicCPT` object. 
+
+    .. py:attribute:: deterministic_cpt_semisupervised
+        :type: InlineSection
+
+    Stores deterministic conditional probability tables (CPTs) used when the
+    model is run under semisupervision.
+    
+    Behaves as a dictionary where keys are distribution names, which can 
+    be referenced in the structure file, and each value is a 
+    :py:class:`DeterministicCPT` object.
+
+    .. py:attribute:: virtual_evidence
+        :type: InlineSection
+
+    Stores virtual evidence used in the model.
+    
+    Behaves as a dictionary where keys are virtual evidence names, and each
+    value is a :py:class:`VirtualEvidence` object.
+
+    .. py:attribute:: dense_cpt
+        :type: InlineSection
+
+    Stores dense conditional probability tables (CPTs) used in the model. 
+    
+    Behaves as a dictionary where keys are distribution names, which can 
+    be referenced in the structure file, and each value is a 
+    :py:class:`DenseCPT` object.
 
     .. py:attribute:: mean
         :type: InlineSection
@@ -109,29 +170,16 @@ Central class storing all parameter information.
     corresponding to hidden state names of an emission variable (from 
     :py:attr:`self.name_collection`) and each value is an :py:class:`MX` object.
 
-    .. py:attribute:: dense_cpt
-        :type: InlineSection
+    .. py:method:: __init__(preamble="")
 
-    Stores dense conditional probability tables (CPTs) used in the model. 
-    
-    Behaves as a dictionary where keys are distribution names, which can 
-    be referenced in the structure file, and each value is a 
-    :py:class:`DenseCPT` object.  
+        Create an :py:class:`InputMaster` object where the ``preamble``
+        attribute is set to the provided value and all other attributes
+        are empty.
 
-    .. py:attribute:: deterministic_cpt
-        :type: InlineSection
+        :param preamble: Preamble to include before all parameters.
+        :type preamble: str
 
-    Stores deterministic conditional probability tables (CPTs) used in the model.
-    
-    Behaves as a dictionary where keys are distribution names, which can 
-    be referenced in the structure file, and each value is a 
-    :py:class:`DeterministicCPT` object.
-
-    .. py:method:: __init__(self)
-
-        Create an `InputMaster` object where all attributes are empty.
-
-    .. py:method:: save(self, filename)
+    .. py:method:: save(filename)
 
         Save all parameters to the provided file, for Segway to use in training
         and annotation.
@@ -158,12 +206,33 @@ Parameter Classes
 
 Class representing user-defined model parameters.
 
+.. py:class:: DecisionTree
+
+    A container class storing a string representing a decision tree.
+
+    .. py:method:: __init__(tree)
+
+        Create a :py:class:`DecisionTree` object containing the provided
+        decision tree.
+
+        :param tree: String representation of a decision tree
+        :type tree: str
+
+Usage example:
+
+.. code-block:: python
+
+    # Read a string representation of a tree from a file
+    example_tree = open("example_tree.dt").readlines()
+    input_master.dt["example_tree"] = DecisionTree(example_tree)
+
+
 .. py:class:: NameCollection
 
     A list of names with a specialized string method for writing to the 
     parameter file.
 
-    .. py:method:: __init__(self, names)
+    .. py:method:: __init__(names)
 
         Create a :py:class:`NameCollection` object containing the provided names.
 
@@ -180,6 +249,55 @@ Usage example:
         NameCollection(["label1", "label2"])
     # Alternately, a list will be converted to a NameCollection
     input_master.name_collection["labels"] = ["label1", "label2"]
+
+
+.. py:class:: DirichletTable
+
+    A Numpy ``ndarray`` describing a Dirichlet distribution, with a specialized
+    string method for writing to the parameter file.
+
+    .. py:method:: __init__(*args, keep_shape=False)
+
+        Create a :py:class:`DirichletTable` object storing the provided distribution.
+
+        :param args: The probability distribution as an array of probabilties which is interpreted by the Numpy ``array`` constructor. 
+        :type args: array_like
+        :param keep_shape: If a single item is passed, this determines if that item's shape is kept or if an additional leading dimension of size 1 is added by the Numpy ``array`` constructor. It has no effect when multiple arguments are passed.
+        :param keep_shape: bool
+
+
+.. py:class:: DeterministicCPT
+
+    A deterministic conditional probability table (CPT) described using an 
+    existing decision tree with a specialized string method for writing to 
+    the parameter file.
+
+    .. py:attribute:: cardinality_parents
+        :type: tuple[int]
+
+        A tuple of integers describing the cardinality (number of states) for
+        the parent variables. If it is empty, there are no parent variables.
+
+    .. py:attribute:: cardinality
+        :type: int
+
+        The cardinality of this variable.
+
+    .. py:attribute:: dt
+        :type: str
+
+        The name of the decision tree representing this deterministic CPT.
+
+    .. py:method:: __init__(self, cardinality_parents, cardinality, dt)
+        
+        Creates a :py:class:`DeterministicCPT` with the provided attributes.
+
+        :param cardinality_parents: The cardinality of parent variables
+        :type cardinality_parents: tuple[int] or tuple
+        :param cardinality: The cardinality of this variable
+        :type cardinality: int
+        :param dt: Name of an existing decision tree 
+        :type dt: str 
 
 
 .. py:class:: Mean
@@ -352,6 +470,8 @@ Usage example:
 
         :param args: The probability distribution as an array of probabilties which is interpreted by the Numpy ``array`` constructor. 
         :type args: array_like
+        :param keep_shape: If a single item is passed, this determines if that item's shape is kept or if an additional leading dimension of size 1 is added by the Numpy ``array`` constructor. It has no effect when multiple arguments are passed.
+        :param keep_shape: bool
 
     .. py:classmethod:: uniform_from_shape(*shape, self=0.0)
 
@@ -380,46 +500,12 @@ Usage example:
         DenseCPT.uniform_from_shape(2, 2, self_transition = 0.6)
 
 
-.. py:class:: DeterministicCPT
-
-    A deterministic conditional probability table (CPT) described using an 
-    existing decision tree with a specialized string method for writing to 
-    the parameter file.
-
-    .. py:attribute:: cardinality_parents
-        :type: tuple[int]
-
-        A tuple of integers describing the cardinality (number of states) for
-        the parent variables. If it is empty, there are no parent variables.
-
-    .. py:attribute:: cardinality
-        :type: int
-
-        The cardinality of this variable.
-
-    .. py:attribute:: dt
-        :type: str
-
-        The name of the decision tree representing this deterministic CPT.
-
-    .. py:method:: __init__(self, cardinality_parents, cardinality, dt)
-        
-        Creates a :py:class:`DeterministicCPT` with the provided attributes.
-
-        :param cardinality_parents: The cardinality of parent variables
-        :type cardinality_parents: tuple[int] or tuple
-        :param cardinality: The cardinality of this variable
-        :type cardinality: int
-        :param dt: Name of an existing decision tree 
-        :type dt: str 
-
-
 Internal Classes
 ================
 
-These classes are internal to the operation of the GMTK API, so the user
+These classes are internal to the operation of the Segway Toolkit, so the user
 should not need to define or interact with these. However, they are documented
-here for any developers interested in expanding or customizing the GMTK API.
+here for any developers interested in expanding or customizing the Segway Toolkit.
 
 Section Classes
 ---------------
