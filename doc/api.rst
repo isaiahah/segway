@@ -1,6 +1,6 @@
-====================
+========================
 Segway Toolkit Reference
-====================
+========================
 
 Description
 ===========
@@ -85,22 +85,11 @@ Central class storing all parameter information.
     .. py:attribute:: deterministic_cpt
         :type: InlineSection
 
-    Stores deterministic conditional probability tables (CPTs) used when the
-    model is run without supervision.
+    Stores deterministic conditional probability tables (CPTs).
     
     Behaves as a dictionary where keys are distribution names, which can 
     be referenced in the structure file, and each value is a 
     :py:class:`DeterministicCPT` object. 
-
-    .. py:attribute:: deterministic_cpt_semisupervised
-        :type: InlineSection
-
-    Stores deterministic conditional probability tables (CPTs) used when the
-    model is run under semisupervision.
-    
-    Behaves as a dictionary where keys are distribution names, which can 
-    be referenced in the structure file, and each value is a 
-    :py:class:`DeterministicCPT` object.
 
     .. py:attribute:: virtual_evidence
         :type: InlineSection
@@ -167,8 +156,8 @@ Central class storing all parameter information.
     components and dense probability mass functions.
     
     Behaves as a dictionary where keys are distribution names, usually 
-    corresponding to hidden state names of an emission variable (from 
-    :py:attr:`self.name_collection`) and each value is an :py:class:`MX` object.
+    corresponding to hidden state names of an emission variable and each value
+    is an :py:class:`MX` object.
 
     .. py:method:: __init__(preamble="")
 
@@ -263,7 +252,18 @@ Usage example:
         :param args: The probability distribution as an array of probabilties which is interpreted by the Numpy ``array`` constructor. 
         :type args: array_like
         :param keep_shape: If a single item is passed, this determines if that item's shape is kept or if an additional leading dimension of size 1 is added by the Numpy ``array`` constructor. It has no effect when multiple arguments are passed.
-        :param keep_shape: bool
+        :type args keep_shape: bool
+
+Usage example:
+
+.. code-block:: python
+
+    # Create a DirichletTable object with the given probability distribution
+    input_master.dirichlet["diriclet_prior"] = \
+        DirichletTable(
+            [[990, 9, 0],
+             [990, 9, 0],
+             [990, 9, 0]])
 
 
 .. py:class:: DeterministicCPT
@@ -288,16 +288,104 @@ Usage example:
 
         The name of the decision tree representing this deterministic CPT.
 
-    .. py:method:: __init__(self, cardinality_parents, cardinality, dt)
+    .. py:method:: __init__(cardinality_parents, cardinality, dt)
         
         Creates a :py:class:`DeterministicCPT` with the provided attributes.
 
         :param cardinality_parents: The cardinality of parent variables
-        :type cardinality_parents: tuple[int] or tuple
+        :type cardinality_parents: tuple[int] or int
         :param cardinality: The cardinality of this variable
         :type cardinality: int
         :param dt: Name of an existing decision tree 
         :type dt: str 
+
+Usage example:
+
+.. code-block:: python
+
+    # Create a DeterministicCPT object referencing the example_tree Decision Tree
+    input_master.deterministic_cpt["example_deterministic_cpt"] = \
+        DeterministicCPT((parent1_card, parent2_card), child_card,
+                         "example_tree")
+
+
+.. py:class:: VirtualEvidence
+
+    A Virtual Evidence object with a specialized string method for writing the
+    data to the parameter file.
+
+    .. py:method:: __init__(num_segs, ve_list_filename)
+
+        Create a :py:class:`VirtualEvidence` object which will be printed in
+        the format
+        ``1 num_segs 2 ve_list_filename nfs:num_segs nis:0 fmt:ascii END``.
+
+        :param num_segs: The number of segments this virtual evidence will cover
+        :type num_segs: int
+        :param ve_list_filename: filename containing the virtual evience list
+        :type ve_list_filename: str
+
+Usage example:
+
+.. code-block:: python
+
+    # Create a VirtualEvidence object over 4 segments referencing "ve_file.txt"
+    input_master.virtual_evidence = VirtualEvidence(4, "ve_file.txt")
+
+
+.. py:class:: DenseCPT
+
+    A Numpy ``ndarray`` representing a dense conditional probability table 
+    (CPT) with a specialized string method for writing to the parameter file. 
+    Supports up to 3 dimensional tables.
+    
+    .. py:method:: __init__(*args)
+
+        Create a :py:class:`DenseCPT` object storing the provided distribution.
+
+        :param args: The probability distribution as an array of probabilties which is interpreted by the Numpy ``array`` constructor. 
+        :type args: array_like
+        :param keep_shape: If a single item is passed, this determines if that item's shape is kept or if an additional leading dimension of size 1 is added by the Numpy ``array`` constructor. It has no effect when multiple arguments are passed.
+        :param keep_shape: bool
+
+    .. py:method:: set_dirichlet_table(dirichlet_name)
+
+        Set the name of a :py:class:`DirichletTable` this object will reference as a prior
+        in its string representation. If this method is not called, the string
+        reference will not reference a :py:class:`DirichletTable` prior.
+
+        :param dirichlet_name: Name of :py:class:`DirichletTable` object to reference as prior
+        :type dirichlet_name: str
+        :returns: None
+        :rtype: None
+
+    .. py:classmethod:: uniform_from_shape(*shape, self_transition=0.0)
+
+        A class method for creating a :py:class:`DenseCPT` object with the provided 
+        shape.
+        If the table is 2 or 3 dimensional, the diagonal entries of the table 
+        are set to the ``self_transition`` parameter (default 0.0) and all other 
+        entries are set to be uniform. 
+
+        :param shape: Shape of Dense CPT table
+        :type shape: Array_like or multiple arguments
+        :param self_transition: Value for diagonal entries in the table. Defaults to 0.0
+        :type self_transition: float
+        :returns: Uniform :py:class:`DenseCPT` object with the given shape and transition probabilities
+        :rtype: :py:class:`DenseCPT`
+
+Usage example:
+
+.. code-block:: python
+
+    # Create a custom DenseCPT in the InputMaster dense_cpt 
+    # InlineSection.
+    input_master.dense_cpt["start"] = \
+        DenseCPT([[0.7, 0.3], [0.8, 0.2]])
+    # Create a DenseCPT with specified diagonal value and 
+    # uniform other values
+    input_master.dense_cpt["transition"] = \
+        DenseCPT.uniform_from_shape(2, 2, self_transition = 0.6)
 
 
 .. py:class:: Mean
@@ -306,7 +394,7 @@ Usage example:
     string method for writing to the parameter file. Supports monovariate 
     and multivariate distributions.
 
-    .. py:method:: __init__(self, *args)
+    .. py:method:: __init__(*args)
 
         Create a :py:class:`Mean` object storing the provided mean value or 
         vector.
@@ -330,7 +418,7 @@ Usage example:
     specialized string method for writing to the parameter file. Supports 
     monovariate and multivariate distributions.
 
-    .. py:method:: __init__(self, *args)
+    .. py:method:: __init__(*args)
 
         Create a :py:class:`Covar` object storing the provided covariance 
         value or vector.
@@ -355,14 +443,21 @@ Usage example:
     is intended for use in Gaussian mixture models, it supports monovariate 
     distributions only. 
 
-    .. py:method:: __init__(self, *args)
+    .. py:method:: __init__(*args)
 
         Create a :py:class:`DPMF` object storing the provided distribution.
 
         :param args: The probability distribution as an array of probabilties which is interpreted by the Numpy ``array`` constructor. 
         :type args: array_like or multiple arguments
 
-    .. py:classmethod:: uniform_from_shape(self, shape)
+    .. py:method:: set_dirichlet_pseudocount(pseudocount)
+
+        Set the Dirichlet pseudocount which will be used in the DPMF and included in its string representation.
+
+        :param pseudocount: Dirichlet pseudocount to normalize DPMF entries
+        :type pseudocount: int
+
+    .. py:classmethod:: uniform_from_shape(shape)
 
         A class method for creating a uniform DPMF with the specified shape.
 
@@ -378,14 +473,14 @@ Usage example:
     # Create a custom DPMF object in the InputMaster mean InlineSection
     input_master.dpmf["biased"] = DPMF([0.7, 0.3])
     # Create a uniform DPMF with a specified shape
-    input_master.dpmf["uniform"] = DPMF.uniform_from_shape(3)
+    input_master.dpmf["uniform"] = DPMF.uniform_from_shape(2)
 
 
 .. py:class:: DiagGaussianMC
 
-    A Gaussian distribution with a diagonal covariance matrix, for use as a 
-    mixture component (MC) in a Gaussian mixture model. Currently the only 
-    concrete MC subclass. 
+    A Gaussian distribution with a diagonal covariance matrix, with the type
+    ``COMPONENT_TYPE_DIAG_GAUSSIAN``, for use as a mixture component (MC) in a
+    Gaussian mixture model.
 
     .. py:attribute:: mean
         :type: str
@@ -399,10 +494,39 @@ Usage example:
         Name of a :py:class:`Covar` object representing the covariance 
         vector along the diagonal of the covariance matrix. 
 
-    .. py:method:: __init__(self, mean, covar)
+    .. py:method:: __init__(mean, covar)
 
         Create a :py:class:`DiagGaussianMC` object with the specified mean 
         and covariance.
+
+        :param mean: Name of a Mean object for the distribution mean
+        :type mean: str
+        :param covar: Name of a Covar object for the diagonal covariance vector of the distribution
+        :type covar: str
+
+    
+.. py:class:: MissingFeatureDiagGaussianMC
+
+    A Gaussian distribution with a diagonal covariance matrix, with the type
+    ``COMPONENT_TYPE_MISSING_FEATURE_SCALED_DIAG_GAUSSIAN``, for use as a
+    mixture component (MC) in a Gaussian mixture model.
+
+    .. py:attribute:: mean
+        :type: str
+
+        Name of a :py:class:`Mean` object representing the mean of this 
+        Gaussian.
+    
+    .. py:attribute:: covar
+        :type: str
+        
+        Name of a :py:class:`Covar` object representing the covariance 
+        vector along the diagonal of the covariance matrix. 
+
+    .. py:method:: __init__(mean, covar)
+
+        Create a :py:class:`MissingFeatureDiagGaussianMC` object with the
+        specified mean and covariance.
 
         :param mean: Name of a Mean object for the distribution mean
         :type mean: str
@@ -418,8 +542,9 @@ Usage example:
     # Arguments are labels for Mean and Covariance objects.
     input_master.mc["dist1"] = \
         DiagGaussianMC(mean = "dist1", covar = "dist1")
+    # Similarly create a MissingFeatureDiagGaussianMC object.
     input_master.mc["dist2"] = \
-        DiagGaussianMC(mean = "dist2", covar = "dist2")
+        MissingFeatureDiagGaussianMC(mean = "dist2", covar = "dist2")
 
 
 .. py:class:: MX
@@ -438,7 +563,7 @@ Usage example:
 
         Names of Gaussian components associated with the mixture model. 
 
-    .. py:method:: __init__(self, dpmf, components)
+    .. py:method:: __init__(dpmf, components)
 
         Create an :py:class:`MX` object with the mixture distribution and 
         components.
@@ -454,50 +579,33 @@ Usage example:
 
     # Create a MX objects in the InputMaster mx InlineMXSection.
     # Arguments are labels for DPMF and MX objects.
-    input_master.mx["emission1"] = MX("biased", ["dist1", "dist2"])
+    input_master.mx["emission1"] = MX("uniform", ["dist1", "dist2"])
     input_master.mx["emission2"] = MX("biased", ["dist1", "dist2"])
 
 
-.. py:class:: DenseCPT
+.. py:class:: GenericString
 
-    A Numpy ``ndarray`` representing a dense conditional probability table 
-    (CPT) with a specialized string method for writing to the parameter file. 
-    Supports up to 3 dimensional tables.
+    A class representing a generic string, with no additional formatting
+    performed when converting to a string representation. This is provided for
+    representing one-off objects which do not fall into any of the above
+    categories. 
     
-    .. py:method:: __init__(self, *args)
+    Note that if the user wants to use this, they should create a new attribute
+    in :py:class:`InputMaster` which is initialized to an :py:class:`InlineSection`
+    for ``OBJ_KIND_GENERIC_STRING``.
 
-        Create a :py:class:`DenseCPT` object storing the provided distribution.
+    .. py:attribute:: contents
+        :type: str
 
-        :param args: The probability distribution as an array of probabilties which is interpreted by the Numpy ``array`` constructor. 
-        :type args: array_like
-        :param keep_shape: If a single item is passed, this determines if that item's shape is kept or if an additional leading dimension of size 1 is added by the Numpy ``array`` constructor. It has no effect when multiple arguments are passed.
-        :param keep_shape: bool
+        The string which the object will produce as its string representation.
 
-    .. py:classmethod:: uniform_from_shape(*shape, self=0.0)
+    .. py:method:: __init__(contents)
 
-        A class method for creating a :py:class:`DenseCPT` object with the provided 
-        shape.
-        If the table is 2 or 3 dimensional, the diagonal entries of the table 
-        are set to the ``self_transition`` parameter (default 0.0) and all other 
-        entries are set to be uniform. 
+        Create a :py:class:`GenericString` object with the provided string as
+        its contents.
 
-        :param shape: Shape of Dense CPT table
-        :type shape: Array_like or multiple arguments
-        :param self_transition: Value for diagonal entries in the table. Defaults to 0.0
-        :type self: float
-
-Usage example:
-
-.. code-block:: python
-
-    # Create a custom DenseCPT in the InputMaster dense_cpt 
-    # InlineSection.
-    input_master.dense_cpt["start"] = \
-        DenseCPT([[0.7, 0.3], [0.8, 0.2]])
-    # Create a DenseCPT with specified diagonal value and 
-    # uniform other values
-    input_master.dense_cpt["transition"] = \
-        DenseCPT.uniform_from_shape(2, 2, self_transition = 0.6)
+        :param contents: String for this object to provide as its string representation.
+        :type contents: str
 
 
 Internal Classes
@@ -590,15 +698,56 @@ Abstract superclasses of the concrete Parameter classes described above.
     is provided and ``keep_shape`` is true, the created object will have 0 dimensions. 
     Otherwise, the created object will have 1 dimension and that value as the only item.
 
-.. py:class:: OneLineKind
-    
-    An abstract class which is the parent for Array-like GMTK parameter 
-    classes which have a one-line string representation, such as 
-    :py:class:`Mean`, :py:class:`Covar`, and :py:class:`DPMF`.
+.. py:class:: MultiDimArray
 
-    As a child of :py:class:`Array`, it behaves like a Numpy ``ndarray`` for data storage.
-    However, when written to the input master file, its header and contents are printed 
-    as a single line.
+    An abstract class which is a child of :py:class:`Array` and the parent for
+    Array-like GMTK parameter classes which have a multiple-line string
+    representation such as :py:class:`DenseCPT` and
+    :py:class:`DirichletTable`.
+
+    As a child of :py:class:`Array` it behaves like a Numpy ``ndarray`` for
+    data storage.
+
+    .. py:method:: __str__()
+
+        Return a string representation of the array, without brackets.
+
+        :returns: String representation of the array, across multiple lines
+        :rtype: str
+
+    .. py:method:: get_header_info()
+
+        Return header information regarding the size of the array, formatted
+        as as the number of parents (1 less than the number of array
+        dimensions) followed by the shape of the array along each dimension,
+        with all items separated by spaces.
+
+        This method may be overwritten in subclasses.
+
+        :returns: String representation of the array dimensions for usage as a header
+        :rtype: str
+
+.. py:class:: OneLineArray
+    
+    An abstract class which is a child of :py:class:`Array` and the parent for
+    Array-like GMTK parameter classes which have a single-line string
+    representation such as :py:class:`Mean`, :py:class:`Covar`, and
+    :py:class:`DPMF`.
+
+    As a child of :py:class:`Array` it behaves like a Numpy ``ndarray`` for
+    data storage.
+
+    .. py:method:: get_header_info()
+
+        Return both header information regarding the size of the array and the
+        array contents, formatted in a single line. The header information is
+        a single value describing the number of items in the array. All items
+        are separated by spaces.
+
+        This method may be overwritten in subclasses.
+
+        :returns: String representation of the array dimensions for usage as a header
+        :rtype: str
 
 .. py:class:: Section
 
@@ -613,7 +762,21 @@ Abstract superclasses of the concrete Parameter classes described above.
         object. If not given, it is set by the first item. This should not be 
         changed by user.
 
-    .. py:method:: __init__(self, kind)
+    .. py:attribute:: line_before
+        :type: str
+
+        A string which will be printed immediately before the contents of 
+        this section. This is provided to support C preprocessor commands
+        (such as ``if`` conditional statements).
+        
+    .. py:attribute:: line_after
+        :type: str
+
+        A string which will be printed immediately after the contents of 
+        this section. This is provided to support C preprocessor commands
+        (such as ``else`` conditional statments).
+
+    .. py:method:: __init__(kind)
 
         Create a Section object with the specified kind.
 

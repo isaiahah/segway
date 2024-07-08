@@ -22,7 +22,7 @@ OBJ_KIND_MC = "MC"
 OBJ_KIND_MX = "MX"
 OBJ_KIND_DT = "DT"
 OBJ_KIND_VECPT = "VE_CPT"
-OBJ_KIND_ARBITRARYSTRING = "ARBITRARY_STRING"
+OBJ_KIND_GENERICSTRING = "GENERIC_STRING"
 OBJ_KIND_DIRICHLETTAB = "DIRICHLET_TAB"
 
 
@@ -499,7 +499,7 @@ class DeterministicCPT:
                  cardinality: str, dt: str):
         """
         Initialize a single DeterministicCPT object.
-        :param cardinality_parents: tuple[int]: cardinality of parents
+        :param cardinality_parents: tuple[int] or int: cardinality of parents
         (if empty, then number of parents = 0)
         :param cardinality: int: cardinality of self
         :param dt: str: name existing Decision Tree (DT) associated with
