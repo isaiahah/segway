@@ -159,7 +159,7 @@ def save_input_master(runner, input_master_filename, params_dirpath=None,
         pseudocounts = (probs * pseudocounts_per_row).astype(int)
 
         input_master.dirichlet["dirichlet_segCountDown_seg_segTransition"] = \
-            DirichletTable(pseudocounts, keep_shape=True)
+            DirichletTable(pseudocounts)
 
     # Deterministic CPTs (DETERMINISTIC_CPT_IN_FILE) for the unsupervised case
     card_segCountDown = runner.card_seg_countdown
@@ -215,8 +215,7 @@ def save_input_master(runner, input_master_filename, params_dirpath=None,
     input_master.dense_cpt["start_seg"] = DenseCPT.uniform_from_shape(card_seg)
     # Dense CPT describing subsegment probabilities given segment
     input_master.dense_cpt["seg_subseg"] = \
-        DenseCPT(fill_array(1.0 / card_subseg, (card_seg, card_subseg)),
-                 keep_shape=True)
+        DenseCPT(fill_array(1.0 / card_subseg, (card_seg, card_subseg)))
     # DenseCPT describing segment to segment transition
     input_master.dense_cpt["seg_seg"] = \
         DenseCPT.uniform_from_shape(card_seg, card_seg,
@@ -439,7 +438,7 @@ def make_dense_cpt_segCountDown_seg_segTransition(runner):  # noqa
 
 def make_dense_cpt_segCountDown_seg_segTransition_cpt(runner):
     probs = make_dense_cpt_segCountDown_seg_segTransition(runner)
-    res = DenseCPT(probs, keep_shape=True)
+    res = DenseCPT(probs)
 
     if runner.len_seg_strength > 0:
         res.set_dirichlet_table(NAME_SEGCOUNTDOWN_SEG_SEGTRANSITION)

@@ -48,13 +48,12 @@ NumericArrayLike = Union[float, int, ndarray]
 
 
 class Array(ndarray):
-    def __new__(cls, *args: NumericArrayLike, keep_shape: bool = False) \
+    def __new__(cls, *args: NumericArrayLike) \
             -> Array:
         """
         Create a new Array containing the provided value(s).
-        If passed a single value and keep_shape is False, insert a new first
-        dimension of size 1. This is needed for creating vector arrays
-        (dimension 1) from a single scalar input value.
+        If passed a single value, insert a new first dimension of size 1 so
+        the result is a vector array with dimension 1.
         """
         # Ensure all arguments belong to the correct type
         if not all((isinstance(arg, float) or isinstance(arg, int) or
@@ -62,16 +61,18 @@ class Array(ndarray):
             # If union iterable, fix. Otherwise, hardwrite
             raise TypeError("Argument has incompatible type."
                             "Expected float, int, or ndarray.")
-
+        
+        # Create an array containing the passed arguments
         input_array = array(args)
+
+        # If given a single argument, a leading dimension of size 1 was added.
+        # If the argument was not numeric, remove this to preserve shapes.
+        if len(args) == 1 and isinstance(args[0], ndarray):
+            input_array = squeeze(input_array, axis = 0)
 
         # Create a new array object with the same data as input_array
         # but with the type of cls (i.e. Array)
         res = asarray(input_array).view(cls)
-
-        # If keep_shape is true, remove the new dimension
-        if len(args) == 1 and keep_shape:
-            res = squeeze(res, axis=0)
 
         return res
 
@@ -183,7 +184,7 @@ class DenseCPT(MultiDimArray):
                 for index in final_indices:
                     values[index] = self_transition
 
-        return DenseCPT(values, keep_shape=True)
+        return DenseCPT(values)
 
 
 class DirichletTable(MultiDimArray):
@@ -351,7 +352,7 @@ class DPMF(OneLineArray):
         value = 1.0 / shape
         dpmf_values.fill(value)
 
-        return DPMF(dpmf_values, keep_shape=True)
+        return DPMF(dpmf_values)
 
     def set_dirichlet_pseudocount(self, pseudocount: int):
         """
